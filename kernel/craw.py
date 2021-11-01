@@ -9,6 +9,7 @@ import urllib3
 import json
 import os
 import re
+import datetime
 from lxml import etree
 from urllib.parse import unquote
 from config import CVE_LIST_URL, HIGH_RISK_LIST_URL, AVD_DETAIL_URL, SAVE_THREAD_SLEEP_TIME, \
@@ -157,6 +158,7 @@ def get_high_risk_page_avd(page):
             if not re.match(r'^\d{4}-\d{2}-\d{2}$', disclosure_time):
                 logger.warning(f'get a strange disclosure time: {disclosure_time}')
                 continue
+            disclosure_time = disclosure_time.replace('-', '')
             data.append((avd, disclosure_time))
 
     return data
@@ -273,14 +275,17 @@ def get_avds(current_version: str) -> list:
     cve_page_number = get_cve_page_number()
     logger.info(f'cve page number: {cve_page_number}')
 
+    # Extend the time range to avoid delays in official updates
+    current_date = datetime.datetime.strptime(current_version, '%Y%m%d')
+    delta_date = datetime.timedelta(days=31)
+
     break_flag = False
     for page in range(1, cve_page_number + 1):
         data = get_cve_page_avd(page)
         logger.info(f'get {len(data)} items from page {page}')
         for avd, disclosure_time in data:
-            disclosure_time = disclosure_time.replace('-', '')
-            # Extend the time range to avoid delays in official updates
-            if int(disclosure_time) >= int(current_version) - 31:
+            disclosure_date = datetime.datetime.strptime(disclosure_time, '%Y%m%d')
+            if disclosure_date >= current_date - delta_date:
                 avds.add(avd)
             else:
                 break_flag = True
@@ -298,8 +303,8 @@ def get_avds(current_version: str) -> list:
         data = get_high_risk_page_avd(page)
         logger.info(f'get {len(data)} items from page {page}')
         for avd, disclosure_time in data:
-            disclosure_time = disclosure_time.replace('-', '')
-            if int(disclosure_time) >= int(current_version):
+            disclosure_date = datetime.datetime.strptime(disclosure_time, '%Y%m%d')
+            if disclosure_date >= current_date - delta_date:
                 avds.add(avd)
             else:
                 break_flag = True
