@@ -277,7 +277,7 @@ def get_avds(current_version: str) -> list:
 
     # Extend the time range to avoid delays in official updates
     current_date = datetime.datetime.strptime(current_version, '%Y%m%d')
-    delta_date = datetime.timedelta(days=180)
+    delta_date = datetime.timedelta(days=365)
 
     break_flag = False
     for page in range(1, cve_page_number + 1):
