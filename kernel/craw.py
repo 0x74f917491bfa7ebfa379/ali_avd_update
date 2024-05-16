@@ -5,7 +5,6 @@ import random
 import queue
 import requests
 import threading
-import urllib3
 import json
 import os
 import re
@@ -18,7 +17,6 @@ from config import CVE_LIST_URL, HIGH_RISK_LIST_URL, AVD_DETAIL_URL, SAVE_THREAD
 from lib.log import logger
 from lib.utils import calc_str_md5
 
-urllib3.disable_warnings()
 
 avds_list_lock = threading.Lock()
 updated_avds_list_lock = threading.Lock()
@@ -28,7 +26,7 @@ db_file_lock = threading.Lock()
 def sample_sleep_requests(url):
     while True:
         try:
-            req = requests.get(url=url, headers=REQUESTS_HEADER, timeout=REQUESTS_TIME_OUT, verify=False)
+            req = requests.get(url=url, headers=REQUESTS_HEADER, timeout=REQUESTS_TIME_OUT)
             if req.status_code != 200:
                 logger.warning(f'requests have some trouble. url:{url} , status_code: {req.status_code}')
                 return None
@@ -209,13 +207,16 @@ def get_avd_info(avd):
                 continue
             if i + 1 >= len(trs):
                 break
+
             _type = get_xpath_content(url, trs[i+1], 'td[1]')
-            vendor = get_xpath_content(url, trs[i+1], 'td[2]/a')
-            prod = get_xpath_content(url, trs[i+1], 'td[3]/a')
-            version = get_xpath_content(url, trs[i+1], 'td[4]/a')
+            flag = trs[i+1].xpath('td[2]/a')
+            vendor = get_xpath_content(url, trs[i+1], 'td[2]/a') if flag else get_xpath_content(url, trs[i+1], 'td[2]')
+            flag = trs[i+1].xpath('td[3]/a')
+            prod = get_xpath_content(url, trs[i+1], 'td[3]/a') if flag else get_xpath_content(url, trs[i+1], 'td[3]')
+            flag = trs[i+1].xpath('td[4]/a')
+            version = get_xpath_content(url, trs[i+1], 'td[4]/a') if flag else get_xpath_content(url, trs[i+1], 'td[4]')
             flag = trs[i+1].xpath('td[5]/b')
             _from = get_xpath_text_br(url, trs[i+1], 'td[5]/b', ' ') if flag else ''
-
             flag = trs[i+1].xpath('td[6]/b')
             up_to = get_xpath_text_br(url, trs[i+1], 'td[6]/b', ' ') if flag else ''
 
@@ -244,7 +245,8 @@ def get_avd_info(avd):
     trs = html.xpath(f'/html/body/div[3]/div/div[2]/div/div[2]/div/div/table/tbody/tr')
     if trs:
         for tr in trs:
-            cwe_id = get_xpath_content(url, tr, 'td[1]/a')
+            flag = tr.xpath('td[1]/a')
+            cwe_id = get_xpath_content(url, tr, 'td[1]/a') if flag else get_xpath_content(url, tr, 'td[1]')
             if not re.match(r'^CWE-\d+$', cwe_id):
                 continue
             cwe_description = get_xpath_content(url, tr, 'td[2]')
@@ -277,7 +279,7 @@ def get_avds(current_version: str) -> list:
 
     # Extend the time range to avoid delays in official updates
     current_date = datetime.datetime.strptime(current_version, '%Y%m%d')
-    delta_date = datetime.timedelta(days=365)
+    delta_date = datetime.timedelta(days=180)
 
     break_flag = False
     for page in range(1, cve_page_number + 1):
